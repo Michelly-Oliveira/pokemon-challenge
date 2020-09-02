@@ -45,3 +45,10 @@ export const CardContainer = styled.div`
     }
   }
 `;
+
+export const LoadingText = styled.h2`
+  font-family: Roboto;
+  font-weight: bold;
+  font-size: 20px;
+  text-align: center;
+`;
