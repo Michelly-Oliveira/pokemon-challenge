@@ -6,6 +6,8 @@ import Header from "../../components/Header";
 import Card from "../../components/Card";
 
 import api from "../../services/api";
+import formatPokemon from "../../utils/formatPokemon";
+
 import { PokemonProps } from "../Home";
 
 import {
@@ -27,22 +29,17 @@ import {
   FamilyCardsContainer,
 } from "./style";
 
-import formatPokemon from "../../utils/formatPokemon";
-
+// Add the prop pokemon to the state from useLocation
 interface LocationStateProps extends RouteComponentProps {
   pokemon: PokemonProps;
 }
 
-interface AttributesProps {
+// Specify which stats to use
+interface AttributesProps extends PokemonProps {
   hp: number;
   attack: number;
   defense: number;
   speed: number;
-  weight: number;
-  height: number;
-  id: number;
-  name: string;
-  url: string;
 }
 
 interface FamilyProps {
@@ -53,43 +50,41 @@ interface FamilyProps {
 const Details: React.FC = () => {
   const location = useLocation<LocationStateProps>();
 
+  // Start state with an empty object and inform that the type is AttributeProps - so it isn't undefined
   const [attributes, setAttributes] = useState<AttributesProps>(
     {} as AttributesProps
   );
+  // Start state with an empty object and inform that the type is FamilyProps - so it isn't undefined
   const [family, setFamily] = useState<FamilyProps>({} as FamilyProps);
 
-  const getFamily = useCallback(async (pokemon_id: number): Promise<void> => {
-    const checkFamily = await api.get(`pokemon-species/${pokemon_id}`);
+  const getFamilyTree = useCallback(async (pokemon_id: number): Promise<
+    void
+  > => {
+    const familyUrls = await api.get(`pokemon-species/${pokemon_id}`);
 
+    // Store the family data
     const storeFamily = {} as FamilyProps;
 
     // Check if pokemon has any evolution
-    if (checkFamily.data.evolution_chain) {
-      // Get the end of the url: pokemon-species/id
-      const url = checkFamily.data.evolution_chain.url.match(/v2(.*)/);
+    if (familyUrls.data.evolution_chain) {
+      // Get only the end of the url: pokemon-species/id
+      const url = familyUrls.data.evolution_chain.url.match(/v2(.*)/);
 
+      // url[1] = pokemon-species/id
       const evolutions = await api.get(`${url[1]}`);
 
-      // Get id of the evolution
+      // Get id of the evolutions
       // A pokemon can have up to 2 evolutions, and each evolution has a different path
+
+      const evolutionsResultArray = [];
+
+      // Get id of the first evolution
       const getFirstEvolution = evolutions.data.chain.evolves_to[0].species.url.match(
         /pokemon-species\/(.*)\//
       );
-      // Make sure the prop exists
-      const getSecondEvolution =
-        evolutions.data.chain.evolves_to[0].evolves_to.length > 0 &&
-        evolutions.data.chain.evolves_to[0].evolves_to[0].species.url.match(
-          /pokemon-species\/(.*)\//
-        );
-      console.log(getSecondEvolution[1]);
-
-      const evolutionsArray = [];
 
       // Don't show data if evolution is the same as the pokemon being shown
-      if (
-        getFirstEvolution[1] !== undefined &&
-        Number(getFirstEvolution[1]) !== pokemon_id
-      ) {
+      if (getFirstEvolution[1] && Number(getFirstEvolution[1]) !== pokemon_id) {
         const pokemonFirstEvolution = await api.get(
           `pokemon/${getFirstEvolution[1]}`
         );
@@ -98,12 +93,20 @@ const Details: React.FC = () => {
           pokemonFirstEvolution.data
         );
 
-        evolutionsArray.push(formattedFirstEvolution);
+        evolutionsResultArray.push(formattedFirstEvolution);
       }
+
+      // Get id of the second evolution if exists
+      // Make sure the prop exists (array length greater than 0) because not all pokemon have more than 1 evolution
+      const getSecondEvolution =
+        evolutions.data.chain.evolves_to[0].evolves_to.length > 0 &&
+        evolutions.data.chain.evolves_to[0].evolves_to[0].species.url.match(
+          /pokemon-species\/(.*)\//
+        );
 
       // Don't show data if evolution is the same as the pokemon being shown
       if (
-        getSecondEvolution[1] !== undefined &&
+        getSecondEvolution[1] &&
         Number(getSecondEvolution[1]) !== pokemon_id
       ) {
         const pokemonSecondEvolution = await api.get(
@@ -114,17 +117,17 @@ const Details: React.FC = () => {
           pokemonSecondEvolution.data
         );
 
-        evolutionsArray.push(formattedSecondEvolution);
+        evolutionsResultArray.push(formattedSecondEvolution);
       }
 
       Object.assign(storeFamily, {
-        evolutions: evolutionsArray,
+        evolutions: evolutionsResultArray,
       });
     }
 
     // Check if pokemon has a previous form
-    if (checkFamily.data.evolves_from_species) {
-      const url = checkFamily.data.evolves_from_species.url.match(
+    if (familyUrls.data.evolves_from_species) {
+      const url = familyUrls.data.evolves_from_species.url.match(
         /pokemon-species\/(.*)\//
       );
 
@@ -176,11 +179,11 @@ const Details: React.FC = () => {
 
       setAttributes(attr);
 
-      getFamily(attributes.id);
+      getFamilyTree(attributes.id);
     }
 
     getPokemonAttributes();
-  }, [attributes.id, location.state, getFamily]);
+  }, [attributes.id, location.state, getFamilyTree]);
 
   return (
     <>

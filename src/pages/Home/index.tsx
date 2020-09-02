@@ -5,9 +5,9 @@ import Header from "../../components/Header";
 import Card from "../../components/Card";
 
 import api from "../../services/api";
+import formatPokemon from "../../utils/formatPokemon";
 
 import { Container, InputContainer, Input, CardContainer } from "./style";
-import formatPokemon from "../../utils/formatPokemon";
 
 interface ResultsProps {
   name: string;
@@ -37,6 +37,7 @@ const Home: React.FC = () => {
 
       const urlsForPokemons = response.data.results;
 
+      // Each iteration through the urlsForPokemon returns a promise, so we end up with an array of promises. to get the actual result from each item we use Promise.all(): promise that resolves into an array of results when all provided promises have resolved
       const pokemons: PokemonProps[] = await Promise.all(
         urlsForPokemons.map(async (pokemon: ResultsProps) => {
           const pokemonData = await api.get(`${pokemon.url}`);
@@ -57,14 +58,17 @@ const Home: React.FC = () => {
     async (text: string) => {
       const formatText = text.toLowerCase();
 
+      // Store the pokemons that match the text provided by the user
       let displayPokemon = [];
 
+      // Search on the pokemons list  each time the user types
       const findPokemon = pokemonsList.filter((pokemon) =>
         pokemon.name.includes(formatText)
       );
 
       displayPokemon = [...findPokemon];
 
+      // If the text input is not empty and no matching pokemon was found on the pokemons list, search the API
       if (formatText && findPokemon.length === 0) {
         const response = await api.get(`pokemon/${formatText}`);
 
@@ -91,6 +95,7 @@ const Home: React.FC = () => {
           />
         </InputContainer>
 
+        {/* If no text was typed, display the pokemonsList - data from the api. Otherwise, display the searchedPokemon */}
         <CardContainer>
           {(searchedPokemon &&
             searchedPokemon.map((pokemon) => (
