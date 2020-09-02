@@ -43,8 +43,9 @@ interface AttributesProps extends PokemonProps {
 }
 
 interface FamilyProps {
-  evolutions: PokemonProps[];
-  evolved: PokemonProps;
+  // evolutions: PokemonProps[];
+  // evolved: PokemonProps;
+  family: PokemonProps[];
 }
 
 const Details: React.FC = () => {
@@ -55,7 +56,7 @@ const Details: React.FC = () => {
     {} as AttributesProps
   );
   // Start state with an empty object and inform that the type is FamilyProps - so it isn't undefined
-  const [family, setFamily] = useState<FamilyProps>({} as FamilyProps);
+  const [familyTree, setFamilyTree] = useState<FamilyProps>({} as FamilyProps);
 
   const getFamilyTree = useCallback(async (pokemon_id: number): Promise<
     void
@@ -63,7 +64,7 @@ const Details: React.FC = () => {
     const familyUrls = await api.get(`pokemon-species/${pokemon_id}`);
 
     // Store the family data
-    const storeFamily = {} as FamilyProps;
+    const family = [];
 
     // Check if pokemon has any evolution
     if (familyUrls.data.evolution_chain) {
@@ -73,85 +74,51 @@ const Details: React.FC = () => {
       // url[1] = pokemon-species/id
       const evolutions = await api.get(`${url[1]}`);
 
-      // Get id of the evolutions
-      // A pokemon can have up to 2 evolutions, and each evolution has a different path
+      const firstForm = evolutions.data.chain.species.url;
+      const firstFormId = firstForm.match(/pokemon-species\/(.*)\//)[1];
 
-      const evolutionsResultArray = [];
-
-      // Get id of the first evolution
-      const getFirstEvolution = evolutions.data.chain.evolves_to[0].species.url.match(
-        /pokemon-species\/(.*)\//
-      );
-
-      // Don't show data if evolution is the same as the pokemon being shown
-      if (getFirstEvolution[1] && Number(getFirstEvolution[1]) !== pokemon_id) {
-        const pokemonFirstEvolution = await api.get(
-          `pokemon/${getFirstEvolution[1]}`
-        );
+      if (firstFormId && Number(firstFormId) !== pokemon_id) {
+        const pokemonFirstEvolution = await api.get(`pokemon/${firstFormId}`);
 
         const formattedFirstEvolution = formatPokemon(
           pokemonFirstEvolution.data
         );
 
-        evolutionsResultArray.push(formattedFirstEvolution);
+        family.push(formattedFirstEvolution);
       }
 
-      // Get id of the second evolution if exists
-      // Make sure the prop exists (array length greater than 0) because not all pokemon have more than 1 evolution
-      const getSecondEvolution =
-        evolutions.data.chain.evolves_to[0].evolves_to.length > 0 &&
-        evolutions.data.chain.evolves_to[0].evolves_to[0].species.url.match(
-          /pokemon-species\/(.*)\//
-        );
+      const secondForm = evolutions.data.chain.evolves_to[0].species.url || "";
+      const secondFormId = secondForm.match(/pokemon-species\/(.*)\//)[1];
 
-      // Don't show data if evolution is the same as the pokemon being shown
-      if (
-        getSecondEvolution[1] &&
-        Number(getSecondEvolution[1]) !== pokemon_id
-      ) {
-        const pokemonSecondEvolution = await api.get(
-          `pokemon/${getSecondEvolution[1]}`
-        );
+      if (secondFormId && Number(secondFormId) !== pokemon_id) {
+        const pokemonSecondEvolution = await api.get(`pokemon/${secondFormId}`);
 
         const formattedSecondEvolution = formatPokemon(
           pokemonSecondEvolution.data
         );
 
-        evolutionsResultArray.push(formattedSecondEvolution);
+        family.push(formattedSecondEvolution);
       }
 
-      Object.assign(storeFamily, {
-        evolutions: evolutionsResultArray,
-      });
-    }
+      const thirdForm =
+        evolutions.data.chain.evolves_to[0].evolves_to.length > 0 &&
+        evolutions.data.chain.evolves_to[0].evolves_to[0].species.url.match(
+          /pokemon-species\/(.*)\//
+        );
+      const thirdFormId = thirdForm[1];
 
-    // Check if pokemon has a previous form
-    if (familyUrls.data.evolves_from_species) {
-      const url = familyUrls.data.evolves_from_species.url.match(
-        /pokemon-species\/(.*)\//
-      );
+      if (thirdFormId && Number(thirdFormId) !== pokemon_id) {
+        const pokemonThirdEvolution = await api.get(`pokemon/${thirdFormId}`);
 
-      const evolutionsId = storeFamily.evolutions.map(
-        (evolution) => evolution.id
-      );
+        const formattedThirdEvolution = formatPokemon(
+          pokemonThirdEvolution.data
+        );
 
-      // On the third evolution, a past form appears both on the evolutions array as in the evolves_from_species
-      // If it is equal, only show one
-      if (
-        Number(url[1]) !== evolutionsId[0] &&
-        Number(url[1]) !== evolutionsId[1]
-      ) {
-        const evolved = await api.get(`pokemon/${url[1]}`);
-
-        const formattedEvolved = formatPokemon(evolved.data);
-
-        Object.assign(storeFamily, {
-          evolved: formattedEvolved,
-        });
+        family.push(formattedThirdEvolution);
       }
     }
 
-    setFamily(storeFamily);
+    setFamilyTree({ family });
   }, []);
 
   useEffect(() => {
@@ -250,16 +217,14 @@ const Details: React.FC = () => {
         </Stats>
       </CardContainer>
 
-      {(family.evolutions || family.evolved) && (
+      {familyTree.family && (
         <FamilyTree>
           <FamilyTitle>Family Tree</FamilyTitle>
 
           <FamilyCardsContainer>
-            {family.evolved && <Card pokemon={family.evolved} />}
-            {family.evolutions &&
-              family.evolutions.map((evolution) => (
-                <Card key={evolution.id} pokemon={evolution} />
-              ))}
+            {familyTree.family.map((evolution) => (
+              <Card key={evolution.id} pokemon={evolution} />
+            ))}
           </FamilyCardsContainer>
         </FamilyTree>
       )}
