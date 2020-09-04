@@ -39,13 +39,12 @@ const Home: React.FC = () => {
   const [searchedPokemon, setSearchedPokemon] = useState<PokemonProps[]>();
   const [nextUrl, setNextUrl] = useState();
 
-  const getPokemonList = useCallback(async (): Promise<void> => {
-    const response = await api.get(`pokemon?${nextUrl}`);
+  const setUrlAndFormatPokemonList = useCallback(async (apiResponse) => {
+    setNextUrl(apiResponse.next.match(/pokemon\?(.*)/)[1]);
 
-    setNextUrl(response.data.next.match(/pokemon\?(.*)/)[1]);
+    const urlsForPokemons = apiResponse.results;
 
-    const urlsForPokemons = response.data.results;
-
+    // Each iteration through the urlsForPokemon returns a promise, so we end up with an array of promises. to get the actual result from each item we use Promise.all(): promise that resolves into an array of results when all provided promises have resolved
     const pokemons: PokemonProps[] = await Promise.all(
       urlsForPokemons.map(async (pokemon: ResultsProps) => {
         const pokemonData = await api.get(`${pokemon.url}`);
@@ -56,32 +55,28 @@ const Home: React.FC = () => {
       })
     );
 
+    return pokemons;
+  }, []);
+
+  const getMorePokemonFromApi = useCallback(async (): Promise<void> => {
+    const response = await api.get(`pokemon?${nextUrl}`);
+
+    const pokemons = await setUrlAndFormatPokemonList(response.data);
+
     setPokemonsList((state) => [...state, ...pokemons]);
-  }, [nextUrl]);
+  }, [nextUrl, setUrlAndFormatPokemonList]);
 
   useEffect(() => {
     async function initialLoad(): Promise<void> {
       const response = await api.get(`pokemon?limit=100&offset=0`);
 
-      const urlsForPokemons = response.data.results;
-      setNextUrl(response.data.next.match(/pokemon\?(.*)/)[1]);
-
-      // Each iteration through the urlsForPokemon returns a promise, so we end up with an array of promises. to get the actual result from each item we use Promise.all(): promise that resolves into an array of results when all provided promises have resolved
-      const pokemons: PokemonProps[] = await Promise.all(
-        urlsForPokemons.map(async (pokemon: ResultsProps) => {
-          const pokemonData = await api.get(`${pokemon.url}`);
-
-          const formattedPokemon = formatPokemon(pokemonData.data);
-
-          return formattedPokemon;
-        })
-      );
+      const pokemons = await setUrlAndFormatPokemonList(response.data);
 
       setPokemonsList(pokemons);
     }
 
     initialLoad();
-  }, []);
+  }, [setUrlAndFormatPokemonList]);
 
   const handleNameInput = useCallback(
     async (text: string) => {
@@ -127,8 +122,7 @@ const Home: React.FC = () => {
         {/* If no text was typed, display the pokemonsList - data from the api. Otherwise, display the searchedPokemon */}
         <InfiniteScroll
           initialLoad={false}
-          loader={<LoadingText key={0}>Loading...</LoadingText>}
-          loadMore={getPokemonList}
+          loadMore={getMorePokemonFromApi}
           hasMore={!!nextUrl}
           threshold={20}
         >
